@@ -3,6 +3,6 @@
 后面会继续更新其他效果
 
 ***目录：***<br>
-`fireworks.html` 放烟花
-`balls-collide` 小球碰撞检测
+`fireworks.html` 放烟花<br>
+`balls-collide` 小球碰撞检测<br>
 ……
