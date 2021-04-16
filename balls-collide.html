@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>小球碰撞检测</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/css/bootstrap-reboot.css">
+  <style>
+    body {
+      margin: 0;
+    }
+
+    canvas {
+      display: block;
+    }
+  </style>
+</head>
+
+<body>
+<canvas id="canvas"></canvas>
+
+<script>
+  const canvas = document.getElementById('canvas')
+  const ctx = canvas.getContext('2d')
+  const canvasWidth = window.innerWidth
+  const canvasHeight = window.innerHeight
+
+  canvas.width = canvasWidth
+  canvas.height = canvasHeight
+
+  // 小球集合
+  let balls = []
+
+  window.onload = () => {
+    init()
+  }
+
+  // 向量相关计算
+  class Vector2d {
+    constructor(x, y) {
+      this.x = x
+      this.y = y
+    }
+
+    // 两个向量相加
+    add(vector) {
+      return new Vector2d(this.x + vector.x, this.y + vector.y)
+    }
+
+    // 两个向量相减
+    subtract(vector) {
+      return new Vector2d(this.x - vector.x, this.y - vector.y)
+    }
+
+    // 当前向量取反
+    negate() {
+      return new Vector2d(-this.x, -this.y)
+    }
+
+    // 计算向量模长
+    calcLength() {
+      return Math.sqrt(this.x * this.x + this.y * this.y)
+    }
+
+    // 计算向量点积
+    calcDotProduct(vector) {
+      return this.x * vector.x + this.y * vector.y
+    }
+
+    // 获取单位向量
+    normalize() {
+      const length = this.calcLength() // 计算出向量模（向量的长度）
+      return new Vector2d(this.x / length, this.y / length)
+    }
+
+    // 缩放向量
+    scale(ratio) {
+      return new Vector2d(this.x * ratio, this.y * ratio)
+    }
+
+    // 旋转向量
+    // 向量顺时针旋转某弧度（坐标沿着原点x正轴方向）
+    rotate(angle) {
+      const x1 = this.x * Math.cos(angle) - this.y * Math.sin(angle)
+      const y1 = this.x * Math.sin(angle) + this.y * Math.cos(angle)
+
+      return new Vector2d(x1, y1)
+    }
+  }
+
+  // 小球
+  class Ball {
+    constructor(x, y) {
+      this.x = x // 圆心坐标
+      this.y = y
+      this.speedX = randomRange(1, 10) // x,y轴上基础速度
+      this.speedY = randomRange(1, 10)
+      this.color = `hsl(${Math.ceil(randomRange(120, 360))}, 80%, 50%)`
+
+      this.radius = randomRange(20, 35)
+      this.density = 1 // 密度
+    }
+
+    // 绘制小球
+    draw() {
+      ctx.beginPath()
+      ctx.fillStyle = this.color
+      ctx.arc(this.x, this.y, this.radius, 0, 2 * Math.PI)
+      ctx.fill()
+    }
+  }
+
+  // 初始化
+  function init() {
+    // 创建10个小球
+    for (let i = 0; i < 20; i++) {
+      const x = randomRange(0, canvasWidth)
+      const y = randomRange(0, canvasHeight)
+      balls.push(new Ball(x, y))
+    }
+
+    loopRender()
+  }
+
+  // 循环渲染
+  function loopRender() {
+    requestAnimationFrame(loopRender)
+
+    ctx.clearRect(0, 0, canvasWidth, canvasHeight)
+
+    for (let i = 0; i < balls.length; i++) {
+      balls[i].draw()
+    }
+
+    updateBalls()
+  }
+
+  // 更新小球属性
+  function updateBalls() {
+    for (let i = 0; i < balls.length; i++) {
+      boundaryCollisionDetect(balls[i])
+
+      for (let j = i + 1; j < balls.length; j++) {
+        ballsCollisionDetect(balls[i], balls[j])
+      }
+
+      // 更新位置
+      balls[i].x += balls[i].speedX
+      balls[i].y += balls[i].speedY
+    }
+  }
+
+  // 单个小球碰撞到边界检测
+  function boundaryCollisionDetect(ball) {
+    if (
+      // 向右移动 圆心坐标x+半径>=画布宽时（移动到画布最右侧）
+      (ball.speedX > 0 && (ball.x + ball.radius) >= canvasWidth) ||
+      // 向左移动 圆心坐标x小于半径时（移动到画布最左侧）
+      (ball.speedX < 0 && ball.x <= ball.radius)
+    ) {
+      ball.speedX = -ball.speedX // x轴上速度置反
+    }
+
+    if (
+      // 向下移动 圆心坐标y+半径>=画布高时（移动到画布最底下 canvas坐标是从左上角开始的）
+      (ball.speedY > 0 && (ball.y + ball.radius) >= canvasHeight) ||
+      // 向上移动 圆心坐标y小于半径时（移动到画布最顶上）
+      (ball.speedY < 0 && ball.y <= ball.radius)
+    ) {
+      ball.speedY = -ball.speedY
+    }
+  }
+
+  // 两个小球碰撞检测
+  function ballsCollisionDetect(ballA, ballB) {
+    // 两个小球当前圆心坐标的距离
+    const currentDistance = calcPointsDistance(ballA.x, ballA.y, ballB.x, ballB.y)
+    // 下一刻两个小球当前圆心坐标的距离（加上一次速度后）
+    const nextDistance = calcPointsDistance(
+      ballA.x + ballA.speedX,
+      ballA.y + ballA.speedY,
+      ballB.x + ballB.speedX,
+      ballB.y + ballB.speedY
+    )
+
+    // 当两个小球是在相互靠近 且下一刻 两个小球圆心坐标之间的距离 小于两个小球半径的和
+    if (nextDistance < currentDistance && currentDistance < (ballA.radius + ballB.radius)) {
+      // 初始速度向量
+      const initialBallASpeed = new Vector2d(ballA.speedX, ballA.speedY)
+      const initialBallBSpeed = new Vector2d(ballB.speedX, ballB.speedY)
+
+      // 球心方向单位向量
+      const s = new Vector2d(ballB.x - ballA.x, ballB.y - ballA.y).normalize()
+      // 垂直球心方向单位向量
+      const t = s.rotate(Math.PI / 2)
+
+      // 速度在球心向量上的分速度投影
+      const initialBallASpeedSc = initialBallASpeed.calcDotProduct(s)/s.calcLength()
+      const initialBallBSpeedSc = initialBallBSpeed.calcDotProduct(s)/s.calcLength()
+      // 速度在垂直球心向量上的分速度投影
+      const initialBallASpeedTc = initialBallASpeed.calcDotProduct(t)/t.calcLength()
+      const initialBallBSpeedTc = initialBallBSpeed.calcDotProduct(t)/t.calcLength()
+
+      // 碰撞后球心方向上的分速度
+      // 能量守恒定律
+      const finalBallASpeedSc = (initialBallASpeedSc * (ballA.density * Math.pow(ballA.radius, 3) - ballB.density * Math.pow(ballB.radius, 3)) + 2 * (ballB.density * Math.pow(ballB.radius, 3)) * initialBallBSpeedSc)
+        / (ballA.density * Math.pow(ballA.radius, 3) + ballB.density * Math.pow(ballB.radius, 3))
+      const finalBallBSpeedSc = (initialBallBSpeedSc * (ballB.density * Math.pow(ballB.radius, 3) - ballA.density * Math.pow(ballA.radius, 3)) + 2 * (ballA.density * Math.pow(ballA.radius, 3)) * initialBallASpeedSc)
+        / (ballA.density * Math.pow(ballA.radius, 3) + ballB.density * Math.pow(ballB.radius, 3))
+
+      // 碰撞后球心方向上的分速度向量
+      const finalBallASpeedS = s.scale(finalBallASpeedSc)
+      const finalBallBSpeedS = s.scale(finalBallBSpeedSc)
+      // 碰撞后垂直球心方向上的分速度向量
+      const finalBallASpeedT = t.scale(initialBallASpeedTc)
+      const finalBallBSpeedT = t.scale(initialBallBSpeedTc)
+
+      // 结束速度向量
+      const finalBallASpeed = finalBallASpeedS.add(finalBallASpeedT)
+      const finalBallBSpeed = finalBallBSpeedS.add(finalBallBSpeedT)
+
+      // 更新速度属性
+      ballA.speedX = finalBallASpeed.x
+      ballA.speedY = finalBallASpeed.y
+      ballB.speedX = finalBallBSpeed.x
+      ballB.speedY = finalBallBSpeed.y
+    }
+  }
+
+  // 获取范围内的随机数
+  function randomRange(min, max) {
+    return Math.random() * (max - min) + min
+  }
+
+  // 计算两点之间的距离
+  function calcPointsDistance(x1, y1, x2, y2) {
+    return Math.sqrt(Math.pow((x2 - x1), 2) + Math.pow((y2 - y1), 2))
+  }
+</script>
+</body>
+</html>
